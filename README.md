@@ -1,6 +1,6 @@
-# MD_post_processing
+# MD tutorial and post processing
 
-Welcome to the MD_post_processing repository! This guide provides instructions on how to run Molecular Dynamics (MD) simulations.
+Welcome to the MD and post-processing repository! This guide provides instructions on how to run Molecular Dynamics (MD) simulations.
 
 ## Overview
 This repository focuses on the simulation process itself, rather than the underlying physics. For a deeper understanding of the physics involved, I recommend "Introduction to Molecular Dynamics" by Allen and Smit.
