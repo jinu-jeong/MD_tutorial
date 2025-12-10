@@ -5,7 +5,7 @@ import torch
 
 
 #%%
-def read_xyz_file(path, same_atom_type=True, same_box_size=True):
+def read_xyz_file(path, same_atom_type=True, same_box_size=True, max_frames=10000):
 
     if os.path.exists(path)==False:
         return [], []
@@ -14,6 +14,7 @@ def read_xyz_file(path, same_atom_type=True, same_box_size=True):
     XYZ = []
     BOX = []
     f = open(path, "r")
+    frame_count = 0
     while(1):
         atom_type = []
         xyz = []
@@ -40,6 +41,10 @@ def read_xyz_file(path, same_atom_type=True, same_box_size=True):
         Atom_type.append(atom_type)
         BOX.append(box)
         XYZ.append(xyz)
+        frame_count += 1
+        if max_frames is not None and frame_count >= max_frames:
+            f.close()
+            break
     
     if same_atom_type==True:
         Atom_type = Atom_type[0]
@@ -161,4 +166,164 @@ class VACF_computer(torch.nn.Module):
         vacf = torch.stack(vacf).reshape(-1)
 
         return vacf
+
+
+#%%
+def compute_com_spce_water(xyz, atom_types):
+    """
+    Compute center of mass for SPCE water molecules.
+    Each molecule: O (mass 15.9994), H (mass 1.008), H (mass 1.008)
+    xyz shape: (n_frames, n_atoms, 6) where last 3 are velocities
+    atom_types: list of atom types (O, H, H, O, H, H, ...)
+    Returns: (n_frames, n_molecules, 6) where last 3 are COM velocities
+    """
+    mass_O = 15.9994
+    mass_H = 1.008
+    total_mass = mass_O + 2 * mass_H
+    
+    # Find O atoms (every 3rd atom starting from 0)
+    n_atoms = len(atom_types)
+    n_molecules = n_atoms // 3
+    
+    com_pos = []
+    com_vel = []
+    
+    for frame in xyz:
+        frame_com_pos = []
+        frame_com_vel = []
+        for mol_idx in range(n_molecules):
+            O_idx = 3 * mol_idx
+            H1_idx = O_idx + 1
+            H2_idx = O_idx + 2
+            
+            # Position COM
+            pos_com = (frame[O_idx, :3] * mass_O + 
+                      frame[H1_idx, :3] * mass_H + 
+                      frame[H2_idx, :3] * mass_H) / total_mass
+            
+            # Velocity COM
+            vel_com = (frame[O_idx, 3:6] * mass_O + 
+                      frame[H1_idx, 3:6] * mass_H + 
+                      frame[H2_idx, 3:6] * mass_H) / total_mass
+            
+            frame_com_pos.append(pos_com)
+            frame_com_vel.append(vel_com)
+        
+        com_pos.append(frame_com_pos)
+        com_vel.append(frame_com_vel)
+    
+    com_pos = np.array(com_pos)
+    com_vel = np.array(com_vel)
+    com = np.concatenate([com_pos, com_vel], axis=2)
+    
+    return com
+
+
+def compute_com_co2(xyz, atom_types):
+    """
+    Compute center of mass for CO2 molecules.
+    Each molecule: C (mass 12.0107), O (mass 15.9994), O (mass 15.9994)
+    xyz shape: (n_frames, n_atoms, 6) where last 3 are velocities
+    atom_types: list of atom types (C, O, O, C, O, O, ...)
+    Returns: (n_frames, n_molecules, 6) where last 3 are COM velocities
+    """
+    mass_C = 12.0107
+    mass_O = 15.9994
+    total_mass = mass_C + 2 * mass_O
+    
+    # Find C atoms (every 3rd atom starting from 0)
+    n_atoms = len(atom_types)
+    n_molecules = n_atoms // 3
+    
+    com_pos = []
+    com_vel = []
+    
+    for frame in xyz:
+        frame_com_pos = []
+        frame_com_vel = []
+        for mol_idx in range(n_molecules):
+            C_idx = 3 * mol_idx
+            O1_idx = C_idx + 1
+            O2_idx = C_idx + 2
+            
+            # Position COM
+            pos_com = (frame[C_idx, :3] * mass_C + 
+                      frame[O1_idx, :3] * mass_O + 
+                      frame[O2_idx, :3] * mass_O) / total_mass
+            
+            # Velocity COM
+            vel_com = (frame[C_idx, 3:6] * mass_C + 
+                      frame[O1_idx, 3:6] * mass_O + 
+                      frame[O2_idx, 3:6] * mass_O) / total_mass
+            
+            frame_com_pos.append(pos_com)
+            frame_com_vel.append(vel_com)
+        
+        com_pos.append(frame_com_pos)
+        com_vel.append(frame_com_vel)
+    
+    com_pos = np.array(com_pos)
+    com_vel = np.array(com_vel)
+    com = np.concatenate([com_pos, com_vel], axis=2)
+    
+    return com
+
+
+def compute_com_graphene_spce(xyz, atom_types):
+    """
+    Compute center of mass for SPCE water molecules in graphene-confined system.
+    Graphene C atoms are excluded.
+    Each water molecule: O (mass 15.9994), H (mass 1.008), H (mass 1.008)
+    xyz shape: (n_frames, n_atoms, 6) where last 3 are velocities
+    atom_types: list of atom types (O, H, H, ..., C, C, ...)
+    Returns: (n_frames, n_molecules, 6) where last 3 are COM velocities
+    """
+    mass_O = 15.9994
+    mass_H = 1.008
+    total_mass = mass_O + 2 * mass_H
+    
+    # Find where water molecules end (before first C atom)
+    n_atoms = len(atom_types)
+    water_end_idx = 0
+    for i, atom_type in enumerate(atom_types):
+        if atom_type == 'C':
+            water_end_idx = i
+            break
+    else:
+        water_end_idx = n_atoms
+    
+    n_molecules = water_end_idx // 3
+    
+    com_pos = []
+    com_vel = []
+    
+    for frame in xyz:
+        frame_com_pos = []
+        frame_com_vel = []
+        for mol_idx in range(n_molecules):
+            O_idx = 3 * mol_idx
+            H1_idx = O_idx + 1
+            H2_idx = O_idx + 2
+            
+            # Position COM
+            pos_com = (frame[O_idx, :3] * mass_O + 
+                      frame[H1_idx, :3] * mass_H + 
+                      frame[H2_idx, :3] * mass_H) / total_mass
+            
+            # Velocity COM
+            vel_com = (frame[O_idx, 3:6] * mass_O + 
+                      frame[H1_idx, 3:6] * mass_H + 
+                      frame[H2_idx, 3:6] * mass_H) / total_mass
+            
+            frame_com_pos.append(pos_com)
+            frame_com_vel.append(vel_com)
+        
+        com_pos.append(frame_com_pos)
+        com_vel.append(frame_com_vel)
+    
+    com_pos = np.array(com_pos)
+    com_vel = np.array(com_vel)
+    com = np.concatenate([com_pos, com_vel], axis=2)
+    
+    return com
 

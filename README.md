@@ -7,6 +7,9 @@ This repository focuses on the simulation process itself, rather than the underl
 
 ## Contents
 
+- **Tutorial 0: LAMMPS Installation and Hello, World!**
+  - Learn how to install LAMMPS using Conda and run a simple "Hello, world!" script.
+  
 - **Tutorial 1: System Equilibration and Production**
   - Learn how to equilibrate your system and produce reliable simulation results.
   

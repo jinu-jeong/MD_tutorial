@@ -1,3 +1,10 @@
+print "===== System Information ====="
+shell uname -a
+shell hostname
+shell lscpu
+shell free -h
+print "=============================="
+
 ############## Simulator condition ##############
 units           real
 atom_style      full
@@ -51,12 +58,14 @@ dump_modify     1 sort id
 dump_modify     1 element O H
 
 thermo          1000
-run             10000
+run             2000000
 
 undump          1
 
+write_restart equilibrated.restart
+
 ############## Production ##############
-dump            2 all custom 100 dump_Prod.xyz id element xu yu zu vx vy vz fx fy fz
+dump            2 all custom 1 dump_Prod.xyz id element xu yu zu vx vy vz fx fy fz
 dump_modify     2 sort id
 dump_modify     2 element O H
 
